@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPTImage2 生图工具</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --line: #334155;
+      --primary: #38bdf8;
+      --primary-2: #0284c7;
+      --danger: #fb7185;
+      --ok: #34d399;
+      --radius: 18px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #1e293b 0, var(--bg) 45%);
+      color: var(--text);
+    }
+
+    .page {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-end;
+      margin-bottom: 20px;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 { margin-bottom: 8px; font-size: clamp(28px, 5vw, 44px); }
+    h2 { margin-bottom: 14px; font-size: 20px; }
+    h3 { margin-bottom: 8px; font-size: 16px; }
+
+    .muted { color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .stack { display: grid; gap: 18px; }
+
+    .card {
+      background: rgba(17, 24, 39, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    input, textarea, select, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #020617;
+      color: var(--text);
+      font: inherit;
+    }
+
+    input, textarea, select { padding: 12px 13px; }
+    textarea { min-height: 150px; resize: vertical; line-height: 1.55; }
+
+    input[type="checkbox"] { width: auto; accent-color: var(--primary); }
+    input[type="file"] { padding: 10px; }
+
+    .field { margin-bottom: 14px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .checkline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 2px 0 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      padding: 12px 14px;
+      background: var(--panel-2);
+      transition: 0.18s ease;
+    }
+
+    button:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--primary); }
+    button:disabled { cursor: not-allowed; opacity: 0.6; }
+
+    .primary {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: #00111f;
+      font-weight: 700;
+    }
+
+    .danger { color: #ffe4e6; border-color: rgba(251, 113, 133, 0.55); }
+    .actions { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; }
+
+    .status {
+      min-height: 24px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .status.error { color: var(--danger); }
+    .status.ok { color: var(--ok); }
+
+    .preview {
+      display: none;
+      width: 100%;
+      max-height: 260px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #020617;
+      margin-top: 10px;
+    }
+
+    .result-grid, .history-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .result-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .image-card, .history-item {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(2, 6, 23, 0.62);
+      padding: 12px;
+    }
+
+    .image-card img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: contain;
+      border-radius: 12px;
+      background: #020617;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .history-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .history-prompt {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .tiny { font-size: 12px; color: var(--muted); }
+    .empty { color: var(--muted); text-align: center; padding: 30px 12px; }
+    .notice {
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(14, 165, 233, 0.1);
+      color: #bae6fd;
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-top: 12px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    @media (max-width: 860px) {
+      .page { padding: 16px; }
+      .hero { display: block; }
+      .grid, .row, .actions { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1>GPTImage2 生图工具</h1>
+        <p class="muted">在线静态网页，支持 OpenAI Images 风格接口、参考图、下载和历史记录。</p>
+        <div class="notice">安全提示：调用链接和 API Key 只在你的浏览器中使用；不要在公共电脑勾选保存 API Key。生成图片较大时，历史记录只保存参数和 URL 图片，不保存 base64 大图。</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="stack">
+        <section class="card">
+          <h2>接口配置</h2>
+          <div class="field">
+            <label for="apiUrl">调用链接</label>
+            <input id="apiUrl" placeholder="https://api.example.com/v1/images/generations" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="apiKey">API Key</label>
+            <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off">
+          </div>
+          <label class="checkline"><input id="saveApiKey" type="checkbox"> 保存 API Key 到本机浏览器</label>
+          <div class="row">
+            <div class="field">
+              <label for="model">模型</label>
+              <input id="model" value="gpt-image-2" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="size">尺寸</label>
+              <select id="size">
+                <option value="1024x1024">1024x1024</option>
+                <option value="1024x1536">1024x1536</option>
+                <option value="1536x1024">1536x1024</option>
+                <option value="512x512">512x512</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="count">生成数量</label>
+            <select id="count">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="4">4</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>生图输入</h2>
+          <div class="field">
+            <label for="prompt">提示词</label>
+            <textarea id="prompt" placeholder="描述你想生成的图片，例如：一只穿宇航服的橘猫，电影感灯光，超清细节"></textarea>
+          </div>
+          <div class="field">
+            <label for="imageInput">参考图片（可选）</label>
+            <input id="imageInput" type="file" accept="image/*">
+            <img id="imagePreview" class="preview" alt="参考图预览">
+          </div>
+          <div class="actions">
+            <button id="generateBtn" class="primary">生成图片</button>
+            <button id="clearBtn">清空输入</button>
+          </div>
+          <div id="status" class="status">准备就绪。</div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="card">
+          <h2>生成结果</h2>
+          <div id="results" class="result-grid">
+            <div class="empty">生成后的图片会显示在这里。</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="history-top">
+            <h2 style="margin:0">历史记录</h2>
+            <button id="clearHistoryBtn" class="danger" style="width:auto">清空历史</button>
+            <button id="clearLocalBtn" style="width:auto">清除本机数据</button>
+          </div>
+          <div id="history" class="history-list">
+            <div class="empty">暂无历史记录。</div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEYS = {
+      config: 'gptimage2.config.v1',
+      history: 'gptimage2.history.v1'
+    };
+
+    const state = {
+      referenceImage: '',
+      results: [],
+      history: []
+    };
+
+    const els = {
+      apiUrl: document.getElementById('apiUrl'),
+      apiKey: document.getElementById('apiKey'),
+      saveApiKey: document.getElementById('saveApiKey'),
+      model: document.getElementById('model'),
+      size: document.getElementById('size'),
+      count: document.getElementById('count'),
+      prompt: document.getElementById('prompt'),
+      imageInput: document.getElementById('imageInput'),
+      imagePreview: document.getElementById('imagePreview'),
+      generateBtn: document.getElementById('generateBtn'),
+      clearBtn: document.getElementById('clearBtn'),
+      clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+      clearLocalBtn: document.getElementById('clearLocalBtn'),
+      status: document.getElementById('status'),
+      results: document.getElementById('results'),
+      history: document.getElementById('history')
+    };
+
+    function setStatus(message, type = '') {
+      els.status.textContent = message;
+      els.status.className = `status ${type}`.trim();
+    }
+
+    function readConfig() {
+      return {
+        apiUrl: els.apiUrl.value.trim(),
+        apiKey: els.apiKey.value.trim(),
+        saveApiKey: els.saveApiKey.checked,
+        model: els.model.value.trim() || 'gpt-image-2',
+        size: els.size.value,
+        count: Number(els.count.value || 1)
+      };
+    }
+
+    function saveConfig() {
+      const config = readConfig();
+      const stored = {
+        apiUrl: config.apiUrl,
+        model: config.model,
+        size: config.size,
+        count: config.count,
+        saveApiKey: config.saveApiKey,
+        apiKey: config.saveApiKey ? config.apiKey : ''
+      };
+      localStorage.setItem(STORAGE_KEYS.config, JSON.stringify(stored));
+    }
+
+    function loadConfig() {
+      const raw = localStorage.getItem(STORAGE_KEYS.config);
+      if (!raw) return;
+      try {
+        const config = JSON.parse(raw);
+        els.apiUrl.value = config.apiUrl || '';
+        els.apiKey.value = config.apiKey || '';
+        els.saveApiKey.checked = Boolean(config.saveApiKey);
+        els.model.value = config.model || 'gpt-image-2';
+        els.size.value = config.size || '1024x1024';
+        els.count.value = String(config.count || 1);
+      } catch (error) {
+        localStorage.removeItem(STORAGE_KEYS.config);
+      }
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('读取参考图片失败'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function stripDataUrl(dataUrl) {
+      return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+    }
+
+    async function handleImageUpload() {
+      const file = els.imageInput.files && els.imageInput.files[0];
+      if (!file) {
+        state.referenceImage = '';
+        els.imagePreview.style.display = 'none';
+        els.imagePreview.removeAttribute('src');
+        return;
+      }
+      state.referenceImage = await fileToDataUrl(file);
+      els.imagePreview.src = state.referenceImage;
+      els.imagePreview.style.display = 'block';
+      setStatus('参考图已载入。', 'ok');
+    }
+
+    function bindConfigPersistence() {
+      [els.apiUrl, els.apiKey, els.saveApiKey, els.model, els.size, els.count].forEach((el) => {
+        el.addEventListener('input', saveConfig);
+        el.addEventListener('change', saveConfig);
+      });
+    }
+
+    function validateBeforeGenerate(config) {
+      if (!config.apiUrl) throw new Error('请填写调用链接。');
+      if (!config.apiKey) throw new Error('请填写 API Key。');
+      if (!els.prompt.value.trim()) throw new Error('请输入提示词。');
+    }
+
+    function buildRequestBody(config) {
+      const body = {
+        model: config.model,
+        prompt: els.prompt.value.trim(),
+        size: config.size,
+        n: config.count
+      };
+      if (state.referenceImage) {
+        body.image = stripDataUrl(state.referenceImage);
+      }
+      return body;
+    }
+
+    function normalizeImageItem(item, index) {
+      if (item.b64_json) {
+        return {
+          id: `${Date.now()}-${index}`,
+          type: 'base64',
+          src: `data:image/png;base64,${item.b64_json}`,
+          original: item.b64_json
+        };
+      }
+      if (item.url) {
+        return {
+          id: `${Date.now()}-${index}`,
+          type: 'url',
+          src: item.url,
+          original: item.url
+        };
+      }
+      return null;
+    }
+
+    function parseImageResponse(payload) {
+      const data = Array.isArray(payload.data) ? payload.data : [];
+      const images = data.map(normalizeImageItem).filter(Boolean);
+      if (!images.length) throw new Error('响应中没有找到 data[].b64_json 或 data[].url 图片数据。');
+      return images;
+    }
+
+    function looksLikeHtml(text, response) {
+      const contentType = response.headers && response.headers.get && response.headers.get('content-type');
+      return (contentType && contentType.toLowerCase().includes('text/html')) || /^\s*<!doctype html|^\s*<html[\s>]/i.test(text);
+    }
+
+    function createHtmlResponseError(config, response) {
+      const likelyUrl = config.apiUrl.replace(/\/+$/, '') + '/v1/images/generations';
+      return new Error(`接口返回了 HTML 页面，不是图片 API 的 JSON 响应。请检查调用链接是否填成了网站首页、控制台地址或代理前端地址；OpenAI Images 兼容接口通常类似：${likelyUrl}。当前响应地址：${response.url || config.apiUrl}`);
+    }
+
+    async function generateImages() {
+      const config = readConfig();
+      validateBeforeGenerate(config);
+      saveConfig();
+
+      const response = await fetch(config.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify(buildRequestBody(config))
+      });
+
+      const text = await response.text();
+      if (looksLikeHtml(text, response)) {
+        throw createHtmlResponseError(config, response);
+      }
+
+      let payload;
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch (error) {
+        throw new Error(`接口返回的不是 JSON：${text.slice(0, 160)}`);
+      }
+
+      if (!response.ok) {
+        const message = payload.error?.message || payload.message || text || `HTTP ${response.status}`;
+        throw new Error(`接口请求失败：${message}`);
+      }
+
+      return parseImageResponse(payload);
+    }
+
+    function renderResults(images) {
+      state.results = images;
+      els.results.innerHTML = '';
+      images.forEach((image, index) => {
+        const card = document.createElement('div');
+        card.className = 'image-card';
+        const img = document.createElement('img');
+        img.src = image.src;
+        img.alt = `生成图片 ${index + 1}`;
+        const actions = document.createElement('div');
+        actions.className = 'button-row';
+        actions.innerHTML = `
+          <button data-download-result="${index}">下载</button>
+          <button data-copy-result="${index}">${image.type === 'url' ? '复制链接' : '复制图片'}</button>
+        `;
+        card.appendChild(img);
+        card.appendChild(actions);
+        els.results.appendChild(card);
+      });
+    }
+
+    async function handleGenerate() {
+      els.generateBtn.disabled = true;
+      setStatus('正在生成图片，请稍候...');
+      try {
+        const images = await generateImages();
+        renderResults(images);
+        addHistory(images);
+        setStatus(`生成完成，共 ${images.length} 张。`, 'ok');
+      } catch (error) {
+        setStatus(error.message, 'error');
+      } finally {
+        els.generateBtn.disabled = false;
+      }
+    }
+
+    function makeFileName(index) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      return `gptimage2-${stamp}-${index + 1}.png`;
+    }
+
+    function downloadDataUrl(dataUrl, fileName) {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    async function downloadUrl(url, fileName) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        downloadDataUrl(objectUrl, fileName);
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setStatus('图片链接受跨域限制，已尝试在新窗口打开。', 'error');
+      }
+    }
+
+    function downloadImage(image, index) {
+      const fileName = makeFileName(index);
+      if (image.type === 'base64') {
+        downloadDataUrl(image.src, fileName);
+      } else {
+        downloadUrl(image.src, fileName);
+      }
+    }
+
+    async function copyImage(image) {
+      if (image.type === 'url') {
+        await navigator.clipboard.writeText(image.src);
+        setStatus('图片链接已复制。', 'ok');
+        return;
+      }
+      await navigator.clipboard.writeText(image.src);
+      setStatus('图片 base64 已复制。', 'ok');
+    }
+
+    function loadHistory() {
+      const raw = localStorage.getItem(STORAGE_KEYS.history);
+      if (!raw) {
+        state.history = [];
+        return;
+      }
+      try {
+        state.history = JSON.parse(raw);
+      } catch (error) {
+        state.history = [];
+        localStorage.removeItem(STORAGE_KEYS.history);
+      }
+    }
+
+    function compactImagesForHistory(images) {
+      return images.filter((image) => image.type === 'url').map((image) => ({
+        id: image.id,
+        type: image.type,
+        src: image.src,
+        original: image.original
+      }));
+    }
+
+    function saveHistory() {
+      let historyToSave = state.history.slice(0, 20);
+      while (historyToSave.length) {
+        try {
+          localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(historyToSave));
+          state.history = historyToSave;
+          return;
+        } catch (error) {
+          historyToSave = historyToSave.slice(0, -1);
+        }
+      }
+      localStorage.removeItem(STORAGE_KEYS.history);
+      state.history = [];
+      setStatus('历史记录过大，已自动清理本机历史。', 'error');
+    }
+
+    function addHistory(images) {
+      const config = readConfig();
+      const historyImages = compactImagesForHistory(images);
+      const item = {
+        id: String(Date.now()),
+        createdAt: new Date().toISOString(),
+        apiUrl: config.apiUrl,
+        model: config.model,
+        size: config.size,
+        count: config.count,
+        prompt: els.prompt.value.trim(),
+        images: historyImages,
+        imageCount: images.length,
+        responseSummary: `${images.length} image(s): ${images.map((img) => img.type).join(', ')}`
+      };
+      state.history.unshift(item);
+      state.history = state.history.slice(0, 20);
+      saveHistory();
+      renderHistory();
+    }
+
+    function renderHistory() {
+      els.history.innerHTML = '';
+      if (!state.history.length) {
+        els.history.innerHTML = '<div class="empty">暂无历史记录。</div>';
+        return;
+      }
+      state.history.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+          <div class="tiny">${new Date(item.createdAt).toLocaleString()} · ${item.model} · ${item.size} · ${item.imageCount || item.images.length} 张</div>
+          <p class="history-prompt">${escapeHtml(item.prompt)}</p>
+          <div class="button-row">
+            <button data-load-history="${item.id}">载入</button>
+            <button data-delete-history="${item.id}" class="danger">删除</button>
+          </div>
+        `;
+        els.history.appendChild(div);
+      });
+    }
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"]/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;'
+      }[char]));
+    }
+
+    function loadHistoryItem(id) {
+      const item = state.history.find((entry) => entry.id === id);
+      if (!item) return;
+      els.apiUrl.value = item.apiUrl || '';
+      els.model.value = item.model || 'gpt-image-2';
+      els.size.value = item.size || '1024x1024';
+      els.count.value = String(item.count || 1);
+      els.prompt.value = item.prompt || '';
+      renderResults(item.images || []);
+      if (!item.images || !item.images.length) {
+        els.results.innerHTML = '<div class="empty">这条历史只保存了参数，图片数据过大未写入本机历史。</div>';
+      }
+      saveConfig();
+      setStatus('历史记录已载入。', 'ok');
+    }
+
+    function deleteHistoryItem(id) {
+      state.history = state.history.filter((entry) => entry.id !== id);
+      saveHistory();
+      renderHistory();
+      setStatus('历史记录已删除。', 'ok');
+    }
+
+    function clearInputs() {
+      els.prompt.value = '';
+      els.imageInput.value = '';
+      state.referenceImage = '';
+      els.imagePreview.style.display = 'none';
+      els.imagePreview.removeAttribute('src');
+      setStatus('输入已清空。', 'ok');
+    }
+
+    function bindDelegatedActions() {
+      els.results.addEventListener('click', (event) => {
+        const target = event.target.closest('button');
+        if (!target) return;
+        const downloadIndex = target.dataset.downloadResult;
+        const copyIndex = target.dataset.copyResult;
+        if (downloadIndex !== undefined) {
+          downloadImage(state.results[Number(downloadIndex)], Number(downloadIndex));
+        }
+        if (copyIndex !== undefined) {
+          copyImage(state.results[Number(copyIndex)]).catch((error) => setStatus(`复制失败：${error.message}`, 'error'));
+        }
+      });
+
+      els.history.addEventListener('click', (event) => {
+        const target = event.target.closest('button');
+        if (!target) return;
+        if (target.dataset.loadHistory) loadHistoryItem(target.dataset.loadHistory);
+        if (target.dataset.deleteHistory) deleteHistoryItem(target.dataset.deleteHistory);
+      });
+    }
+
+    function init() {
+      loadConfig();
+      loadHistory();
+      renderHistory();
+      bindConfigPersistence();
+      bindDelegatedActions();
+      els.imageInput.addEventListener('change', () => {
+        handleImageUpload().catch((error) => setStatus(error.message, 'error'));
+      });
+      els.generateBtn.addEventListener('click', () => {
+        handleGenerate();
+      });
+      els.clearBtn.addEventListener('click', clearInputs);
+      els.clearHistoryBtn.addEventListener('click', () => {
+        state.history = [];
+        saveHistory();
+        renderHistory();
+        setStatus('历史记录已清空。', 'ok');
+      });
+      els.clearLocalBtn.addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEYS.config);
+        localStorage.removeItem(STORAGE_KEYS.history);
+        state.history = [];
+        state.results = [];
+        els.apiUrl.value = '';
+        els.apiKey.value = '';
+        els.saveApiKey.checked = false;
+        els.model.value = 'gpt-image-2';
+        els.size.value = '1024x1024';
+        els.count.value = '1';
+        clearInputs();
+        els.results.innerHTML = '<div class="empty">生成后的图片会显示在这里。</div>';
+        renderHistory();
+        setStatus('本机配置和历史记录已清除。', 'ok');
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
