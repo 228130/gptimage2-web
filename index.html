@@ -311,6 +311,7 @@
 
     const state = {
       referenceImage: '',
+      referenceFile: null,
       results: [],
       history: []
     };
@@ -396,10 +397,12 @@
       const file = els.imageInput.files && els.imageInput.files[0];
       if (!file) {
         state.referenceImage = '';
+        state.referenceFile = null;
         els.imagePreview.style.display = 'none';
         els.imagePreview.removeAttribute('src');
         return;
       }
+      state.referenceFile = file;
       state.referenceImage = await fileToDataUrl(file);
       els.imagePreview.src = state.referenceImage;
       els.imagePreview.style.display = 'block';
@@ -420,16 +423,39 @@
     }
 
     function buildRequestBody(config) {
-      const body = {
+      return {
         model: config.model,
         prompt: els.prompt.value.trim(),
         size: config.size,
         n: config.count
       };
-      if (state.referenceImage) {
-        body.image = stripDataUrl(state.referenceImage);
+    }
+
+    function buildFetchOptions(config, referenceFile = state.referenceFile) {
+      const headers = {
+        'Authorization': `Bearer ${config.apiKey}`
+      };
+
+      if (referenceFile) {
+        const form = new FormData();
+        form.append('model', config.model);
+        form.append('prompt', els.prompt.value.trim());
+        form.append('size', config.size);
+        form.append('n', String(config.count));
+        form.append('image', referenceFile);
+        return {
+          method: 'POST',
+          headers,
+          body: form
+        };
       }
-      return body;
+
+      headers['Content-Type'] = 'application/json';
+      return {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(buildRequestBody(config))
+      };
     }
 
     function normalizeImageItem(item, index) {
@@ -474,14 +500,7 @@
       validateBeforeGenerate(config);
       saveConfig();
 
-      const response = await fetch(config.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`
-        },
-        body: JSON.stringify(buildRequestBody(config))
-      });
+      const response = await fetch(config.apiUrl, buildFetchOptions(config));
 
       const text = await response.text();
       if (looksLikeHtml(text, response)) {
@@ -703,6 +722,7 @@
       els.prompt.value = '';
       els.imageInput.value = '';
       state.referenceImage = '';
+      state.referenceFile = null;
       els.imagePreview.style.display = 'none';
       els.imagePreview.removeAttribute('src');
       setStatus('输入已清空。', 'ok');
