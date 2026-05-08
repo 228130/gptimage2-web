@@ -253,6 +253,14 @@
             </div>
           </div>
           <div class="field">
+            <label for="requestMode">请求模式</label>
+            <select id="requestMode">
+              <option value="auto">自动：有参考图时使用文件上传</option>
+              <option value="json">JSON：参考图转 base64</option>
+              <option value="multipart">multipart：参考图作为文件上传</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="count">生成数量</label>
             <select id="count">
               <option value="1">1</option>
@@ -320,6 +328,7 @@
       apiUrl: document.getElementById('apiUrl'),
       apiKey: document.getElementById('apiKey'),
       saveApiKey: document.getElementById('saveApiKey'),
+      requestMode: document.getElementById('requestMode'),
       model: document.getElementById('model'),
       size: document.getElementById('size'),
       count: document.getElementById('count'),
@@ -346,6 +355,7 @@
         apiKey: els.apiKey.value.trim(),
         saveApiKey: els.saveApiKey.checked,
         model: els.model.value.trim() || 'gpt-image-2',
+        requestMode: els.requestMode.value || 'auto',
         size: els.size.value,
         count: Number(els.count.value || 1)
       };
@@ -356,6 +366,7 @@
       const stored = {
         apiUrl: config.apiUrl,
         model: config.model,
+        requestMode: config.requestMode || 'auto',
         size: config.size,
         count: config.count,
         saveApiKey: config.saveApiKey,
@@ -373,6 +384,7 @@
         els.apiKey.value = config.apiKey || '';
         els.saveApiKey.checked = Boolean(config.saveApiKey);
         els.model.value = config.model || 'gpt-image-2';
+        els.requestMode.value = config.requestMode || 'auto';
         els.size.value = config.size || '1024x1024';
         els.count.value = String(config.count || 1);
       } catch (error) {
@@ -410,7 +422,7 @@
     }
 
     function bindConfigPersistence() {
-      [els.apiUrl, els.apiKey, els.saveApiKey, els.model, els.size, els.count].forEach((el) => {
+      [els.apiUrl, els.apiKey, els.saveApiKey, els.requestMode, els.model, els.size, els.count].forEach((el) => {
         el.addEventListener('input', saveConfig);
         el.addEventListener('change', saveConfig);
       });
@@ -422,27 +434,39 @@
       if (!els.prompt.value.trim()) throw new Error('请输入提示词。');
     }
 
-    function buildRequestBody(config) {
-      return {
+    function getRequestMode(config, referenceFile = state.referenceFile) {
+      const mode = config.requestMode || 'auto';
+      if (mode === 'json' || mode === 'multipart') return mode;
+      return referenceFile ? 'multipart' : 'json';
+    }
+
+    function buildRequestBody(config, referenceFile = state.referenceFile) {
+      const body = {
         model: config.model,
         prompt: els.prompt.value.trim(),
         size: config.size,
         n: config.count
       };
+      const referenceImage = state.referenceImage || els.imagePreview.src || '';
+      if (referenceFile && getRequestMode(config, referenceFile) === 'json') {
+        body.image = stripDataUrl(referenceImage);
+      }
+      return body;
     }
 
     function buildFetchOptions(config, referenceFile = state.referenceFile) {
+      const mode = getRequestMode(config, referenceFile);
       const headers = {
         'Authorization': `Bearer ${config.apiKey}`
       };
 
-      if (referenceFile) {
+      if (mode === 'multipart') {
         const form = new FormData();
         form.append('model', config.model);
         form.append('prompt', els.prompt.value.trim());
         form.append('size', config.size);
         form.append('n', String(config.count));
-        form.append('image', referenceFile);
+        if (referenceFile) form.append('image', referenceFile);
         return {
           method: 'POST',
           headers,
@@ -454,7 +478,7 @@
       return {
         method: 'POST',
         headers,
-        body: JSON.stringify(buildRequestBody(config))
+        body: JSON.stringify(buildRequestBody(config, referenceFile))
       };
     }
 
