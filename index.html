@@ -255,8 +255,8 @@
           <div class="field">
             <label for="requestMode">请求模式</label>
             <select id="requestMode">
+              <option value="json">JSON：参考图转 base64（默认）</option>
               <option value="auto">自动：有参考图时使用文件上传</option>
-              <option value="json">JSON：参考图转 base64</option>
               <option value="multipart">multipart：参考图作为文件上传</option>
             </select>
           </div>
@@ -355,7 +355,7 @@
         apiKey: els.apiKey.value.trim(),
         saveApiKey: els.saveApiKey.checked,
         model: els.model.value.trim() || 'gpt-image-2',
-        requestMode: els.requestMode.value || 'auto',
+        requestMode: els.requestMode.value || 'json',
         size: els.size.value,
         count: Number(els.count.value || 1)
       };
@@ -366,7 +366,7 @@
       const stored = {
         apiUrl: config.apiUrl,
         model: config.model,
-        requestMode: config.requestMode || 'auto',
+        requestMode: config.requestMode || 'json',
         size: config.size,
         count: config.count,
         saveApiKey: config.saveApiKey,
@@ -384,7 +384,7 @@
         els.apiKey.value = config.apiKey || '';
         els.saveApiKey.checked = Boolean(config.saveApiKey);
         els.model.value = config.model || 'gpt-image-2';
-        els.requestMode.value = config.requestMode || 'auto';
+        els.requestMode.value = config.requestMode || 'json';
         els.size.value = config.size || '1024x1024';
         els.count.value = String(config.count || 1);
       } catch (error) {
@@ -435,7 +435,7 @@
     }
 
     function getRequestMode(config, referenceFile = state.referenceFile) {
-      const mode = config.requestMode || 'auto';
+      const mode = config.requestMode || 'json';
       if (mode === 'json' || mode === 'multipart') return mode;
       return referenceFile ? 'multipart' : 'json';
     }
@@ -519,12 +519,28 @@
       return new Error(`接口返回了 HTML 页面，不是图片 API 的 JSON 响应。请检查调用链接是否填成了网站首页、控制台地址或代理前端地址；OpenAI Images 兼容接口通常类似：${likelyUrl}。当前响应地址：${response.url || config.apiUrl}`);
     }
 
+    function formatElapsed(startedAt) {
+      return `生成用时：${((Date.now() - startedAt) / 1000).toFixed(1)} 秒`;
+    }
+
+    function createFetchError(error, config) {
+      if (/failed to fetch|network/i.test(error.message || '')) {
+        return new Error(`浏览器没有成功连接到接口。常见原因：接口没有开启跨域 CORS、在线网页是 HTTPS 但接口是 HTTP、接口服务器拒绝浏览器请求、网络连接被拦截。当前调用链接：${config.apiUrl}`);
+      }
+      return error;
+    }
+
     async function generateImages() {
       const config = readConfig();
       validateBeforeGenerate(config);
       saveConfig();
 
-      const response = await fetch(config.apiUrl, buildFetchOptions(config));
+      let response;
+      try {
+        response = await fetch(config.apiUrl, buildFetchOptions(config));
+      } catch (error) {
+        throw createFetchError(error, config);
+      }
 
       const text = await response.text();
       if (looksLikeHtml(text, response)) {
@@ -568,15 +584,16 @@
     }
 
     async function handleGenerate() {
+      const startedAt = Date.now();
       els.generateBtn.disabled = true;
       setStatus('正在生成图片，请稍候...');
       try {
         const images = await generateImages();
         renderResults(images);
         addHistory(images);
-        setStatus(`生成完成，共 ${images.length} 张。`, 'ok');
+        setStatus(`生成完成，共 ${images.length} 张。${formatElapsed(startedAt)}`, 'ok');
       } catch (error) {
-        setStatus(error.message, 'error');
+        setStatus(`${error.message}\n${formatElapsed(startedAt)}`, 'error');
       } finally {
         els.generateBtn.disabled = false;
       }
@@ -802,6 +819,7 @@
         els.apiKey.value = '';
         els.saveApiKey.checked = false;
         els.model.value = 'gpt-image-2';
+        els.requestMode.value = 'json';
         els.size.value = '1024x1024';
         els.count.value = '1';
         clearInputs();
