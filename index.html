@@ -230,7 +230,7 @@
           <h2>接口配置</h2>
           <div class="field">
             <label for="apiUrl">调用链接</label>
-            <input id="apiUrl" placeholder="https://api.example.com/v1/images/generations" autocomplete="off">
+            <input id="apiUrl" value="https://image.qianweikeji.fun:3000/v1/images/generations" placeholder="https://api.example.com/v1/images/generations" autocomplete="off">
           </div>
           <div class="field">
             <label for="apiKey">API Key</label>
@@ -312,8 +312,9 @@
   </main>
 
   <script>
-    const STORAGE_KEYS = {
-      config: 'gptimage2.config.v1',
+    const PROXY_URL = 'https://gptimage2-proxy.228130zzz.workers.dev';
+
+    const STORAGE_KEYS = {      config: 'gptimage2.config.v1',
       history: 'gptimage2.history.v1'
     };
 
@@ -351,7 +352,7 @@
 
     function readConfig() {
       return {
-        apiUrl: els.apiUrl.value.trim(),
+        apiUrl: els.apiUrl.value.trim() || 'https://image.qianweikeji.fun:3000/v1/images/generations',
         apiKey: els.apiKey.value.trim(),
         saveApiKey: els.saveApiKey.checked,
         model: els.model.value.trim() || 'gpt-image-2',
@@ -457,7 +458,8 @@
     function buildFetchOptions(config, referenceFile = state.referenceFile) {
       const mode = getRequestMode(config, referenceFile);
       const headers = {
-        'Authorization': `Bearer ${config.apiKey}`
+        'Authorization': `Bearer ${config.apiKey}`,
+        'x-target-url': config.apiUrl
       };
 
       if (mode === 'multipart') {
@@ -525,7 +527,7 @@
 
     function createFetchError(error, config) {
       if (/failed to fetch|network/i.test(error.message || '')) {
-        return new Error(`浏览器没有成功连接到接口。常见原因：接口没有开启跨域 CORS、在线网页是 HTTPS 但接口是 HTTP、接口服务器拒绝浏览器请求、网络连接被拦截。当前调用链接：${config.apiUrl}`);
+        return new Error(`浏览器没有成功连接到代理接口。请检查 Cloudflare Worker 是否可访问。代理地址：${PROXY_URL}；目标调用链接：${config.apiUrl}`);
       }
       return error;
     }
@@ -537,7 +539,7 @@
 
       let response;
       try {
-        response = await fetch(config.apiUrl, buildFetchOptions(config));
+        response = await fetch(PROXY_URL, buildFetchOptions(config));
       } catch (error) {
         throw createFetchError(error, config);
       }
