@@ -255,8 +255,7 @@
           <div class="field">
             <label for="requestMode">请求模式</label>
             <select id="requestMode">
-              <option value="json">JSON：参考图转 base64（默认）</option>
-              <option value="auto">自动：有参考图时使用文件上传</option>
+              <option value="json">JSON：参考图转 base64（默认，推荐）</option>
               <option value="multipart">multipart：参考图作为文件上传</option>
             </select>
           </div>
@@ -367,7 +366,7 @@
       const stored = {
         apiUrl: config.apiUrl,
         model: config.model,
-        requestMode: config.requestMode || 'json',
+        requestMode: 'json',
         size: config.size,
         count: config.count,
         saveApiKey: config.saveApiKey,
@@ -385,7 +384,7 @@
         els.apiKey.value = config.apiKey || '';
         els.saveApiKey.checked = Boolean(config.saveApiKey);
         els.model.value = config.model || 'gpt-image-2';
-        els.requestMode.value = config.requestMode || 'json';
+        els.requestMode.value = 'json';
         els.size.value = config.size || '1024x1024';
         els.count.value = String(config.count || 1);
       } catch (error) {
@@ -437,8 +436,8 @@
 
     function getRequestMode(config, referenceFile = state.referenceFile) {
       const mode = config.requestMode || 'json';
-      if (mode === 'json' || mode === 'multipart') return mode;
-      return referenceFile ? 'multipart' : 'json';
+      if (mode === 'multipart') return 'multipart';
+      return 'json';
     }
 
     function buildRequestBody(config, referenceFile = state.referenceFile) {
